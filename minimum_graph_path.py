@@ -4,13 +4,26 @@ import heapq
 
 # set of functions for finding the minimum path
 # in a two-dimensional user-defined networkx graph
-def distance(coord1: tuple, coord2: tuple):
-    '''Calculates the Euclidean distance between two coordinates'''
-    dx = coord1[0] - coord2[0]
-    dy = coord1[1] - coord2[1]
-    return np.sqrt(dx ** 2 + dy ** 2)
+def distance(graph: nx.Graph(), coord1: tuple, coord2: tuple, metric: str):
+    '''Calculates the distance between two coordinates'''
+    if metric == "euclidean":
+        dx = coord1[0] - coord2[0]
+        dy = coord1[1] - coord2[1]
+        return np.sqrt(dx ** 2 + dy ** 2)
+    elif metric == "l1":
+        dx = coord1[0] - coord2[0]
+        dy = coord1[1] - coord2[1]
+        return np.abs(dx) + np.abs(dy)
+    elif metric == "custom":
+        assigned_weight = graph.get_edge_data(coord1, coord2)
+        if assigned_weight is None:
+            return 0
+        else:
+            return assigned_weight['weight']
+    else:
+        raise ValueError("Metric must be either Euclidean, L1 or a custom user-specified distance metric!")
 
-def findMinPath(graph: nx.Graph(), namedDict: dict, start: str, end: str, algorithm: str):
+def findMinPath(graph: nx.Graph(), namedDict: dict, start: str, end: str, algorithm: str, metric: str):
     '''Calculates the minimum-distance path through a graph'''
     if algorithm == "dijkstra":
         heuristic = 0
@@ -18,6 +31,9 @@ def findMinPath(graph: nx.Graph(), namedDict: dict, start: str, end: str, algori
         heuristic = 1
     else:
         raise ValueError("Algorithm must be either Dijkstra or A*!")
+
+    if metric not in ["euclidean", "l1", "custom"]:
+        raise ValueError("Metric must be either Euclidean, L1 or a custom user-specified distance metric!")
     
     if start == None or end == None:
         raise ValueError("Start and end must be specified!")
@@ -44,7 +60,7 @@ def findMinPath(graph: nx.Graph(), namedDict: dict, start: str, end: str, algori
             break
 
         for neighbor in graph.neighbors(node):
-            newdist = current_dist + distance(node, neighbor) + heuristic * distance(neighbor, end_coord)
+            newdist = current_dist + distance(graph, node, neighbor, metric) + heuristic * distance(graph, neighbor, end_coord, metric)
             if newdist < dist[neighbor]:
                 dist[neighbor] = newdist
                 prev[neighbor] = node
@@ -71,13 +87,21 @@ class Graph:
         if name != None:
             self.dict[name] = coords
 
-    def addEdge(self, coord1: tuple, coord2: tuple):
+    def addEdge(self, coord1: tuple, coord2: tuple, weight = None):
         if coord1 not in self.graph.nodes or coord2 not in self.graph.nodes:
             raise ValueError("Either coordinates not in Graph!")
-        self.graph.add_edge(coord1, coord2, weight = distance(coord1, coord2))
+        if weight is None:
+            w = distance(self.graph, coord1, coord2, metric = "euclidean")
+        else:
+            w = weight
+        self.graph.add_edge(coord1, coord2, weight = w)
 
-    def findMinPath(self):
-        minDist, minPath = findMinPath(self.graph, self.dict, "start", "end", "dijkstra")
+    def findMinPath(self, algorithm: str, metric = None):
+        if metric is None:
+            m = "euclidean"
+        else:
+            m = metric
+        minDist, minPath = findMinPath(self.graph, self.dict, "start", "end", algorithm, metric = m)
         print("The minimum distance found is " + f"{minDist:.2f}")
         print("And the minimum path is {}".format(minPath))
 
@@ -85,13 +109,15 @@ class Graph:
         nx.draw(self.graph)
 
 if __name__ == "__main__":
-    algorithm = "dijkstra"
+    search_algorithm = "dijkstra"
+    search_metric = "euclidean"
 
     Graph = Graph()
     Graph.addNode((0, 0), "start")
     Graph.addNode((0, 1))
     Graph.addNode((1, 1), "end")
-    Graph.addEdge((0, 0), (0, 1))
-    Graph.addEdge((0, 1), (1, 1))
-    Graph.addEdge((0, 0), (1, 1))
-    Graph.findMinPath()
+    Graph.addEdge((0, 0), (0, 1), 1)
+    Graph.addEdge((0, 1), (1, 1), 1)
+    Graph.addEdge((0, 0), (1, 1), 3)
+
+    Graph.findMinPath(algorithm = search_algorithm, metric = search_metric)
